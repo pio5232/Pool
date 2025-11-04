@@ -19,10 +19,10 @@ const int threadCount = 8;
 
 // L1 캐시(NodeStack)를 확실히 고갈시키기 위해 할당량을 늘립니다.
 // kNodeCountPerBlock (1024) 보다 훨씬 많아야 합니다.
-const int allocCountPerLoop = 10000;// 2000;
+const int allocCountPerLoop = 15000;// 2000;
 
 // 테스트 반복 횟수
-const int outerLoopCount = 5000;
+const int outerLoopCount = 50000;
 
 
 using namespace std;
@@ -53,44 +53,44 @@ int main()
 		threads.emplace_back([&mSystem]()
 			{
 				// 포인터를 저장할 배열 
-				A** sys = new A * [allocCountPerLoop];
+				A** a = new A * [allocCountPerLoop];
 
 				// -----------------------------------------------
 				// 테스트 1: new / delete
 				// -----------------------------------------------
-				{
-					// 테스트 전에 최대한 측정이 동일한 환경에서 이루어지도록 사전작업.
-					for (int j = 0; j < allocCountPerLoop; j++)
-					{
-						sys[j] = (new A);
-					}
-					for (int j = 0; j < allocCountPerLoop; j++)
-					{
-						delete sys[j];
-					}
+				//{
+				//	// 테스트 전에 최대한 측정이 동일한 환경에서 이루어지도록 사전작업.
+				//	for (int j = 0; j < allocCountPerLoop; j++)
+				//	{
+				//		a[j] = (new A);
+				//	}
+				//	for (int j = 0; j < allocCountPerLoop; j++)
+				//	{
+				//		delete a[j];
+				//	}
 
-					std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+				//	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
-					for (int i = 0; i < outerLoopCount; i++)
-					{
-						for (int j = 0; j < allocCountPerLoop; j++)
-						{
-							PRO_START("new");
-							sys[j] = (new A);
-							PRO_END("new");
-						}
+				//	for (int i = 0; i < outerLoopCount; i++)
+				//	{
+				//		for (int j = 0; j < allocCountPerLoop; j++)
+				//		{
+				//			PRO_START("new");
+				//			a[j] = (new A);
+				//			PRO_END("new");
+				//		}
 
-						for (int j = 0; j < allocCountPerLoop; j++)
-						{
-							PRO_START("delete");
-							delete sys[j];
-							PRO_END("delete");
-						}
-					}
-					auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - now);
+				//		for (int j = 0; j < allocCountPerLoop; j++)
+				//		{
+				//			PRO_START("delete");
+				//			delete a[j];
+				//			PRO_END("delete");
+				//		}
+				//	}
+				//	auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - now);
 
-					printf("Thread ID [%u]  |   new/delete : %lld ms\n", GetCurrentThreadId(), diff.count());
-				}
+				//	printf("Thread ID [%u]  |   new/delete : %lld ms\n", GetCurrentThreadId(), diff.count());
+				//}
 
 
 				printf("----------------------------------------------------------------------------------\n");
@@ -101,15 +101,18 @@ int main()
 					// 테스트 전에 최대한 측정이 동일한 환경에서 이루어지도록 사전작업.
 					for (int j = 0; j < allocCountPerLoop; j++)
 					{
-						sys[j] = reinterpret_cast<A*>(mSystem.Alloc(sizeof(A)));
+						a[j] = reinterpret_cast<A*>(mSystem.Alloc(sizeof(A)));
 					}
 					for (int j = 0; j < allocCountPerLoop; j++)
 					{
-						mSystem.Free(sys[j]);
+						mSystem.Free(a[j]);
 					}
 
 					// 시간 측정
 					std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+
+
+					const size_t memSize = jh_memory::kPoolSizeArr[(jh_memory::poolTable[sizeof(A)])];
 
 					for (int i = 0; i < outerLoopCount; i++)
 					{
@@ -118,7 +121,13 @@ int main()
 						for (int j = 0; j < allocCountPerLoop; j++)
 						{
 							PRO_START("myPool Alloc");
-							sys[j] = reinterpret_cast<A*>(mSystem.Alloc(sizeof(A)));
+							a[j] = reinterpret_cast<A*>(mSystem.Alloc(sizeof(A)));
+
+							LONGLONG* duplicationChecker = reinterpret_cast<LONGLONG*>(reinterpret_cast<size_t>(a[j]) + memSize - sizeof(LONGLONG)*2);
+
+							if (1 != InterlockedIncrement64(duplicationChecker))
+								DebugBreak();
+							
 							PRO_END("myPool Alloc");
 						}
 
@@ -127,7 +136,13 @@ int main()
 						for (int j = 0; j < allocCountPerLoop; j++)
 						{
 							PRO_START("myPool Free");
-							mSystem.Free(sys[j]);
+
+							LONGLONG* duplicationChecker = reinterpret_cast<LONGLONG*>(reinterpret_cast<size_t>(a[j]) + memSize - sizeof(LONGLONG)*2);
+
+							if (0 != InterlockedDecrement64(duplicationChecker))
+								DebugBreak();
+
+							mSystem.Free(a[j]);
 							PRO_END("myPool Free");
 						}
 					}
@@ -137,7 +152,7 @@ int main()
 				}
 
 				// 포인터 배열 해제
-				delete[] sys; 
+				delete[] a; 
 			});
 	}
 
