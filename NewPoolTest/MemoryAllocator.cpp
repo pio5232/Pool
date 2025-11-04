@@ -68,43 +68,44 @@ jh_memory::MemoryAllocator::~MemoryAllocator()
 	if (nullptr == m_pPool)
 		return;
 
-	// kPoolCount(7개) 만큼 모든 스택을 순회합니다.
 	for (int i = 0; i < kPoolCount; i++)
 	{
-		// 이 스레드가 가지고 있던 NodeStack을 가져옵니다.
 		NodeStack& stack = m_nodeStack[i];
 
-		// 스택에서 노드를 하나 꺼냅니다 (Pop).
-		Node* node = stack.Pop();
-		while (nullptr != node)
+		while (1)
 		{
-			// 꺼낸 노드를 Level 2 (MemoryPool)에 반납합니다.
-			// TryPushNode는 낱개 노드를 반납받기 위해 존재하는 함수입니다.
-			m_pPool[i]->TryPushNode(node);
-
 			// 스택이 빌 때까지 다음 노드를 꺼냅니다.
-			node = stack.Pop();
+			Node* node = stack.Pop();
+			
+			if (nullptr == node)
+				break;
+		
+			m_pPool[i]->TryPushNode(node);
 		}
 	}
 }
 
 void* jh_memory::MemoryAllocator::Alloc(size_t allocSize)
 {
-	//PRO_START_AUTO_FUNC;
+	MEMORY_POOL_PROFILE_FLAG;
 	int poolIdx = poolTable[allocSize];
 
-	// 바로 할당이 불가능한 경우 LEVEL 2에서 가져온다.
-	if (true == m_nodeStack[poolIdx].IsEmpty())
-		AcquireBlockFromPool(poolIdx);
+	void* allocedPointer = m_nodeStack[poolIdx].Pop();
 
-	return m_nodeStack[poolIdx].Pop();
+	// 할당할 메모리가 없는 경우 L2에서 가져와서 다시 할당한다.
+	if (nullptr == allocedPointer)
+	{
+		AcquireBlockFromPool(poolIdx);
+		return m_nodeStack[poolIdx].Pop();
+	}
+	return allocedPointer;
 }
 
 
 
 void jh_memory::MemoryAllocator::Dealloc(void* ptr,size_t allocSize)
 {
-	//PRO_START_AUTO_FUNC;
+	MEMORY_POOL_PROFILE_FLAG;
 	int poolIdx = poolTable[allocSize];
 
 	NodeStack& nodeStack = m_nodeStack[poolIdx];
@@ -113,27 +114,12 @@ void jh_memory::MemoryAllocator::Dealloc(void* ptr,size_t allocSize)
 
 	// 일정 수량 이상이면 절반을 LEVEL 2에 반납한다.
 	
-	if (nodeStack.GetNodeCount() >= (kNodeCountPerBlock * 2))
+	if (nodeStack.GetTotalCount() == (kNodeCountPerBlock * 2))
 	{
-		Node* curNode = nodeStack.m_phead;
-		Node* deallocHeadNode = curNode;
+		m_pPool[poolIdx]->TryPushBlock(nodeStack.m_pSubHead, kNodeCountPerBlock);
+		nodeStack.m_pSubHead = nullptr;
+		nodeStack.m_subCount = 0;
 
-		for (int i = 0; i < (kNodeCountPerBlock -1); i++)
-		{
-			curNode = curNode->m_pNextNode;
-		}
-
-		// [head]	->	[curNode]	->	[tail] 상태에서 
-
-		// [반납]		[head]		->	[tail] 로 설정한다.
-
-		nodeStack.m_phead = curNode->m_pNextNode;
-		curNode->m_pNextNode = nullptr;
-
-		nodeStack.m_nodeCount -= kNodeCountPerBlock;
-
-		// 해당 개수만큼을 LEVEL 2에 반환한다.
-		m_pPool[poolIdx]->TryPushBlock(deallocHeadNode, kNodeCountPerBlock);
 	}
 }
 

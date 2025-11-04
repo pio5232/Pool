@@ -20,7 +20,7 @@ void jh_memory::MemoryPool::RegisterPageAllocator(PageAllocator* pageAllocator)
 
 void jh_memory::MemoryPool::TryPushBlock(Node* nodeHead, size_t nodeCount)
 {
-	//PRO_START_AUTO_FUNC;
+	MEMORY_POOL_PROFILE_FLAG;
 	nodeHead->m_blockSize = nodeCount;
 
 	LONGLONG topComplexNode;
@@ -41,7 +41,7 @@ void jh_memory::MemoryPool::TryPushBlock(Node* nodeHead, size_t nodeCount)
 jh_memory::Node* jh_memory::MemoryPool::TryPopBlock()
 {
 	// 1. FullNode 확인
-	//PRO_START_AUTO_FUNC;
+	MEMORY_POOL_PROFILE_FLAG;
 	LONGLONG topComplexNode;
 
 	Node* topNodePointer;
@@ -79,7 +79,7 @@ void jh_memory::MemoryPool::TryPushBlockList(Node* nodeHead, Node* nodeTail)
 	// [nodeHead](새로운 head) -> [nodeTail] -> [기존 head] 형태로 push
 
 	// 이미 노드들은 원자적으로 연결된 상태로 전달된다.
-	
+	MEMORY_POOL_PROFILE_FLAG;
 	LONGLONG topComplexNode;
 
 	LONGLONG counter = GetIncreasedCounter();
@@ -98,6 +98,7 @@ void jh_memory::MemoryPool::TryPushBlockList(Node* nodeHead, Node* nodeTail)
 // 호출 빈도 수는 매우 적음.
 void jh_memory::MemoryPool::TryPushNode(Node* node)
 {
+	MEMORY_POOL_PROFILE_FLAG;
 	//PRO_START_AUTO_FUNC;
 	Node* separatedNode;
 
@@ -187,9 +188,9 @@ jh_memory::Node* jh_memory::MemoryPool::GetNewBlock()
 //		
 //	}
 
+	MEMORY_POOL_PROFILE_FLAG;
 
-
-	size_t granularitySize = kMaxBlockCount / (jh_memory::kAllocationGranularity / m_allocSize);
+	size_t granularitySize = kNodeCountToCreate / (jh_memory::kAllocationGranularity / m_allocSize);
 
 	//	블록 크기							64,		128,	256,	512,	1024,	2048,	4096
 //	allocationGranurity 당 노드 수			1024,	512,	256,	128,	64,		32,		16

@@ -4,6 +4,15 @@
 
 #include <array>
 
+//#define JH_MEM_FLAG
+
+#ifdef JH_MEM_FLAG
+	#define MEMORY_POOL_PROFILE_FLAG PRO_START_AUTO_FUNC
+#else
+	#define MEMORY_POOL_PROFILE_FLAG 
+#endif
+
+
 namespace jh_memory
 {
 	
@@ -53,12 +62,12 @@ namespace jh_memory
 	// Level 3에서 얻어오는 사이즈를 정하기 위한 수
 	// MemoryPool Size * kMaxBlockCount 와 kAllocationGranularity를 통해 할당받을 사이즈를 정의한다.
 	constexpr size_t kAllocationGranularity = 4096 * 16;
-	constexpr size_t kMaxBlockCount = 4096;
+	constexpr size_t kNodeCountToCreate = 4096;
 	
 	// MemoryPool에서 관리되는 1블럭당 연결된 Node의 수
 	constexpr size_t kNodeCountPerBlock = 512;
 	
-	constexpr size_t kBlockCountToCreate = kMaxBlockCount / kNodeCountPerBlock;
+	constexpr size_t kBlockCountToCreate = kNodeCountToCreate / kNodeCountPerBlock;
 	
 	// Pool에서 관리할 수 있는 최대 사이즈. 이 사이즈를 넘어가면 new / delete를 통해 할당/해제를 진행한다.
 	constexpr size_t kMaxAllocSize = 4096;

@@ -34,7 +34,7 @@ jh_memory::MemorySystem::~MemorySystem()
 
 void* jh_memory::MemorySystem::Alloc(size_t reqSize)
 {
-    //PRO_START_AUTO_FUNC;
+    MEMORY_POOL_PROFILE_FLAG;
     size_t allocSize = reqSize + sizeof(size_t);
     
     void* pAddr;
@@ -56,7 +56,7 @@ void* jh_memory::MemorySystem::Alloc(size_t reqSize)
 
 void jh_memory::MemorySystem::Free(void* ptr)
 {
-    //PRO_START_AUTO_FUNC;
+    MEMORY_POOL_PROFILE_FLAG;
     MemoryHeader* basePtr = MemoryHeader::DetachHeader(ptr);
 
     size_t allocSize = basePtr->m_size;
@@ -74,7 +74,7 @@ void jh_memory::MemorySystem::Free(void* ptr)
 
 jh_memory::MemoryAllocator* jh_memory::MemorySystem::GetMemoryAllocator()
 {
-    //PRO_START_AUTO_FUNC;
+    MEMORY_POOL_PROFILE_FLAG;
     static thread_local jh_memory::MemoryAllocator memoryAllocator;
 
     if (true == memoryAllocator.CanRegisterPool())

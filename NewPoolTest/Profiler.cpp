@@ -222,8 +222,8 @@ void jh_utility::Profiler::ProfileDataOutText(const WCHAR* fileName)
 			if (false == sample.m_bUseFlag)
 				break;
 
-			double minTime = sample.m_ullCallCount == 1 ? (double)sample.m_ullMinTime[0] : (double)sample.m_ullMinTime[1];
-			double maxTime = sample.m_ullCallCount == 1 ? (double)sample.m_ullMaxTime[0] : (double)sample.m_ullMaxTime[1];
+			double minTime = sample.m_ullCallCount <= 2 ? (double)sample.m_ullMinTime[0] : (double)sample.m_ullMinTime[1];
+			double maxTime = sample.m_ullCallCount <= 2 ? (double)sample.m_ullMaxTime[0] : (double)sample.m_ullMaxTime[1];
 			// min, max는 2번째꺼 출력.
 			fwprintf_s(file, L"%15u | %70s | %15.6lf㎲ | %15.6lf㎲ | %15.6lf㎲ | %15u |\n", sample.m_dwThreadId, sample.m_wszSampleName,
 				(double)sample.m_ullTotalTime / sample.m_ullCallCount * MICRO_SCALE(m_llQueryPerformanceFrequency.QuadPart), // AVERAGE

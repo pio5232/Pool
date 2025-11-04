@@ -22,7 +22,7 @@ const int threadCount = 30;
 const int allocCountPerLoop = 2000;
 
 // 테스트 반복 횟수
-const int outerLoopCount = 10000;
+const int outerLoopCount = 2000;
 
 
 using namespace std;
@@ -75,12 +75,16 @@ int main()
 					{
 						for (int j = 0; j < allocCountPerLoop; j++)
 						{
+							PRO_START("new");
 							sys[j] = (new A);
+							PRO_END("new");
 						}
 
 						for (int j = 0; j < allocCountPerLoop; j++)
 						{
+							PRO_START("delete");
 							delete sys[j];
+							PRO_END("delete");
 						}
 					}
 					auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - now);
@@ -88,6 +92,8 @@ int main()
 					printf("Thread ID [%u]  |   new/delete : %lld ms\n", GetCurrentThreadId(), diff.count());
 				}
 
+
+				printf("----------------------------------------------------------------------------------\n");
 				// -----------------------------------------------
 				// 테스트 2: 내 메모리 풀
 				// -----------------------------------------------
@@ -111,14 +117,18 @@ int main()
 						// L2에서 L1으로 얻어오는 작업을 실행
 						for (int j = 0; j < allocCountPerLoop; j++)
 						{
+							PRO_START("myPool Alloc");
 							sys[j] = reinterpret_cast<A*>(mSystem.Alloc(sizeof(A)));
+							PRO_END("myPool Alloc");
 						}
 
 						// 2. 해제(Free)만 연속으로 실행
 						// L1에서 L2로 반납
 						for (int j = 0; j < allocCountPerLoop; j++)
 						{
+							PRO_START("myPool Free");
 							mSystem.Free(sys[j]);
+							PRO_END("myPool Free");
 						}
 					}
 					auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - now);
