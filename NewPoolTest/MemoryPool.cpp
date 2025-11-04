@@ -4,7 +4,8 @@
 
 jh_memory::MemoryPool::MemoryPool(size_t allocSize) : m_allocSize{allocSize}, m_llComplexFullNode {}, m_pPartialNodeHead{}, m_partialNodeCount{}, m_pPageAllocator{}, m_llComplexCounter{}
 {
-	InitializeSRWLock(&m_lock);
+	InitializeSRWLock(&m_partialLock);
+	InitializeSRWLock(&m_allocationLock);
 }
 
 jh_memory::MemoryPool::~MemoryPool()
@@ -36,6 +37,8 @@ void jh_memory::MemoryPool::TryPushBlock(Node* nodeHead, size_t nodeCount)
 
 	while (InterlockedCompareExchange64(&m_llComplexFullNode, newComplexNode, topComplexNode) != topComplexNode);
 
+	InterlockedAdd64(&m_llL2DeallocedNodeCount, static_cast<LONGLONG>(nodeCount));
+
 }
 
 jh_memory::Node* jh_memory::MemoryPool::TryPopBlock()
@@ -59,7 +62,7 @@ jh_memory::Node* jh_memory::MemoryPool::TryPopBlock()
 			// Level 3에서 새로운 메모리를 할당받아서 블록들을 연결한 상태이다.
 			if (nullptr != newBlock)
 				return newBlock;
-		
+	
 			// topNode가 없어서 새로운 블록을 얻으려고 진입했지만 누군가 새로운 블록을 만들어서 다시 경쟁을 하러 내려온 상황이다.
 			continue;
 		}
@@ -68,8 +71,8 @@ jh_memory::Node* jh_memory::MemoryPool::TryPopBlock()
 			break;
 	}
 
+	InterlockedAdd64(&m_llL2AllocedNodeCount, static_cast<LONGLONG>(topNodePointer->m_blockSize));
 	return topNodePointer;
-
 }
 
 
@@ -92,6 +95,7 @@ void jh_memory::MemoryPool::TryPushBlockList(Node* nodeHead, Node* nodeTail)
 	}
 
 	while (InterlockedCompareExchange64(&m_llComplexFullNode, newComplexNode, topComplexNode) != topComplexNode);
+	
 }
 
 // 이 함수는 MemoryAllocator가 소멸될때만 호출되어야한다.
@@ -103,12 +107,14 @@ void jh_memory::MemoryPool::TryPushNode(Node* node)
 	Node* separatedNode;
 
 	{
-		SRWLockGuard lockGuard(&m_lock);
+		SRWLockGuard lockGuard(&m_partialLock);
 
 		// head로 등록
 		node->m_pNextNode = m_pPartialNodeHead;
 		m_pPartialNodeHead = node;
 		m_partialNodeCount++;
+
+		InterlockedIncrement64(&m_llL2DeallocedNodeCount);
 
 		if (kNodeCountPerBlock > m_partialNodeCount)
 			return;
@@ -131,63 +137,16 @@ void jh_memory::MemoryPool::TryPushNode(Node* node)
 
 	// 해당 개수만큼을 LEVEL 2에 반환한다.
 	TryPushBlock(separatedNode, kNodeCountPerBlock);
+
+	LONGLONG r = kNodeCountPerBlock;
+	
+	InterlockedAdd64(&m_llL2DeallocedNodeCount, -r);
+
+
 }
 
 jh_memory::Node* jh_memory::MemoryPool::GetNewBlock()
 {
-	//PRO_START_AUTO_FUNC;
-//	size_t granularitySize = kMaxBlockCount / (jh_memory::kAllocationGranularity / m_allocSize);
-//
-//	//	블록 크기							64,		128,	256,	512,	1024,	2048,	4096
-////	allocationGranurity 당 노드 수			1024,	512,	256,	128,	64,		32,		16
-//
-//	SRWLockGuard lockGuard(&m_lock);
-//	{
-//		LONGLONG topComplexNode = m_llComplexFullNode;
-//
-//		// 진입 시에 이미 다른 스레드가 lock을 통해 페이지 할당받고 자른 게 아닌 경우
-//		if (nullptr == GetNodePointer(topComplexNode))
-//		{
-//			// 페이지 할당
-//			void* allocatedPoitner = m_pPageAllocator->AllocPage(granularitySize);
-//		
-//			Node* blockBaseNode = nullptr;
-//
-//			// page를 할당받고, m_allocSize만큼씩을 쪼개서 블록 단위로 연결
-//			for (size_t numOfBlock = 0; numOfBlock < kBlockCountToCreate; numOfBlock++)
-//			{	
-//				size_t addr = reinterpret_cast<size_t>(allocatedPoitner) + (numOfBlock * m_allocSize * kNodeCountPerBlock);
-//				
-//				// N번째 블락의 시작점은 [시작점 + (풀 할당 크기 * 블락당 노드 수)] 이다.
-//				Node* blockBaseNode = reinterpret_cast<Node*>(addr);
-//
-//				// Node단위로 연결
-//				for (size_t numOfNode = 0; numOfNode < kNodeCountPerBlock - 1; numOfNode++)
-//				{
-//					Node* curNode = reinterpret_cast<Node*>(addr + numOfNode * m_allocSize);
-//					Node* nextNode = reinterpret_cast<Node*>(addr + (numOfNode + 1 ) * m_allocSize);
-//
-//					curNode->m_pNextNode = nextNode;
-//				}
-//
-//				if(numOfBlock < (kBlockCountToCreate -1))
-//					TryPushBlock(blockBaseNode, kNodeCountPerBlock);
-//			}
-//
-//
-//			if(nullptr != blockBaseNode)
-//				blockBaseNode->m_llNextComplexBlock = 0;
-//
-//			return blockBaseNode;
-//		}
-//		else
-//		{
-//			// 만약 Lock을 획득하고 들어왔는데 Top노드가 비어있지 않은 것을 호가인한 상황.
-//			return nullptr;
-//		}
-//		
-//	}
-
 	MEMORY_POOL_PROFILE_FLAG;
 
 	size_t granularitySize = kNodeCountToCreate / (jh_memory::kAllocationGranularity / m_allocSize);
@@ -195,7 +154,7 @@ jh_memory::Node* jh_memory::MemoryPool::GetNewBlock()
 	//	블록 크기							64,		128,	256,	512,	1024,	2048,	4096
 //	allocationGranurity 당 노드 수			1024,	512,	256,	128,	64,		32,		16
 
-	SRWLockGuard lockGuard(&m_lock);
+	SRWLockGuard lockGuard(&m_allocationLock);
 	{
 		LONGLONG topComplexNode = m_llComplexFullNode;
 
@@ -213,15 +172,15 @@ jh_memory::Node* jh_memory::MemoryPool::GetNewBlock()
 			Node* head = nullptr;
 			Node *tail = nullptr;
 
-			// lastBlock : 연결하지 않고 반환해서 사용할 마지막 블락.
+			// lastBlock : 연결하지 않고 반환해서 사용할 마지막 블럭.
 			Node* lastBlock = nullptr;
 
-			// 블록 단위로 연결
+			// 블럭 단위로 연결
 			for (; numOfBlock < kBlockCountToCreate; numOfBlock++)
 			{
 				size_t addr = reinterpret_cast<size_t>(allocatedPoitner) + (numOfBlock * m_allocSize * kNodeCountPerBlock);
 
-				// N번째 블락의 시작점은 [시작점 + (풀 할당 크기 * 블락당 노드 수)] 이다.
+				// N번째 블락의 시작점은 [시작점 + (풀 할당 크기 * 블럭당 노드 수)] 이다.
 				Node* blockBaseNode = reinterpret_cast<Node*>(addr);
 
 				if (numOfBlock > 0 && numOfBlock < (kBlockCountToCreate - 1))
@@ -260,13 +219,14 @@ jh_memory::Node* jh_memory::MemoryPool::GetNewBlock()
 
 			if(nullptr != lastBlock)
 			lastBlock->m_llNextComplexBlock = 0;
+			
+			InterlockedAdd64(&m_llL2TotalNode, kNodeCountToCreate);
+			InterlockedAdd64(&m_llL2AllocedNodeCount, static_cast<LONGLONG>(lastBlock->m_blockSize));
 
 			return lastBlock;
 		}
 		else
 		{
-			// 이 지점에서 do-while문을 통해 가져갈 수 있지만
-			// 만약 여기서 do-while을 했는데도 다른 스레드가 모두 가져가서 남는 노드가 발생할 수도 있지 않을까??
 			return nullptr;
 		}
 

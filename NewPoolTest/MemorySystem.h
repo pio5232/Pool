@@ -52,6 +52,8 @@ namespace jh_memory
 		PageAllocator* m_pageAllocator;
 		
 
+		LONGLONG m_llTestAllocCounter = 0;
+		LONGLONG m_llTestDeallocCounter = 0;
 	};
 }
 

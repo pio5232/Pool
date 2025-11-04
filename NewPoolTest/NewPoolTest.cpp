@@ -15,14 +15,14 @@
 using namespace std;
 
 // 스레드 개수를 CPU 코어 수보다 많게 설정하여 경합을 유도합니다.
-const int threadCount = 30;
+const int threadCount = 8;
 
 // L1 캐시(NodeStack)를 확실히 고갈시키기 위해 할당량을 늘립니다.
 // kNodeCountPerBlock (1024) 보다 훨씬 많아야 합니다.
-const int allocCountPerLoop = 2000;
+const int allocCountPerLoop = 10000;// 2000;
 
 // 테스트 반복 횟수
-const int outerLoopCount = 2000;
+const int outerLoopCount = 5000;
 
 
 using namespace std;
@@ -56,7 +56,7 @@ int main()
 				A** sys = new A * [allocCountPerLoop];
 
 				// -----------------------------------------------
-				// 테스트 1: 표준 new / delete
+				// 테스트 1: new / delete
 				// -----------------------------------------------
 				{
 					// 테스트 전에 최대한 측정이 동일한 환경에서 이루어지도록 사전작업.

@@ -50,13 +50,19 @@ namespace jh_memory
 		PageAllocator* m_pPageAllocator;
 		
 		// MemoryAllocator 존재하는 스레드 종료 시 남아있는 잉여 노드들의 저장을 위해 락 사용
-		SRWLOCK m_lock; 
+		SRWLOCK m_partialLock; 
+		SRWLOCK m_allocationLock; 
 		Node* m_pPartialNodeHead; // Block에 대한 연결
 		size_t m_partialNodeCount;
 
 		alignas(64) LONGLONG m_llComplexCounter;
 		alignas(64) LONGLONG m_llComplexFullNode; // Block에 대한 연결
 
+
+	public:
+		alignas(64) LONGLONG m_llL2TotalNode = 0;
+		alignas(64) LONGLONG m_llL2AllocedNodeCount = 0;
+		alignas(64) LONGLONG m_llL2DeallocedNodeCount =0 ;
 		//alignas(64) Node* m_pFullNodeHead; // Block에 대한 연결
 		//alignas(64) Node* m_pPartialNodeHead; // Block에 대한 연결
 	};
