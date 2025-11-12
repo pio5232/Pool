@@ -2,10 +2,9 @@
 
 #include "Memory.h"
 
-namespace jh_memory	
-{	
+namespace jh_memory
+{
 	class PageAllocator;
-	// ㅇ
 	class MemoryPool
 	{
 	public:
@@ -18,9 +17,8 @@ namespace jh_memory
 		void TryPushBlock(Node* nodeHead, size_t nodeCount);
 		Node* TryPopBlock();
 
-
 		// 여러개의 덩어리 단위로 추가 (메모리 추가 할당 시)
- 		void TryPushBlockList(Node* nodeHead, Node* nodeTail);
+		void TryPushBlockList(Node* nodeHead, Node* nodeTail);
 
 		// 낱개 단위로 반환 (스레드 종료 시)
 		void TryPushNode(Node* node);
@@ -44,14 +42,14 @@ namespace jh_memory
 		{
 			return  reinterpret_cast<Node*>((complexNode & kPointerMask));
 		}
-		
+
 	private:
 		const size_t m_allocSize;
 		PageAllocator* m_pPageAllocator;
-		
+
 		// MemoryAllocator 존재하는 스레드 종료 시 남아있는 잉여 노드들의 저장을 위해 락 사용
-		SRWLOCK m_partialLock; 
-		SRWLOCK m_allocationLock; 
+		SRWLOCK m_partialLock;
+		SRWLOCK m_allocationLock;
 		Node* m_pPartialNodeHead; // Block에 대한 연결
 		size_t m_partialNodeCount;
 
@@ -60,11 +58,11 @@ namespace jh_memory
 
 
 	public:
+#ifdef JH_MEM_ALLOC_CHECK_FLAG
 		alignas(64) LONGLONG m_llL2TotalNode = 0;
 		alignas(64) LONGLONG m_llL2AllocedNodeCount = 0;
-		alignas(64) LONGLONG m_llL2DeallocedNodeCount =0 ;
-		//alignas(64) Node* m_pFullNodeHead; // Block에 대한 연결
-		//alignas(64) Node* m_pPartialNodeHead; // Block에 대한 연결
+		alignas(64) LONGLONG m_llL2DeallocedNodeCount = 0;
+#endif
 	};
 }
 

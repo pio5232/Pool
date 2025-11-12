@@ -4,15 +4,13 @@
 
 namespace jh_memory
 {
-	/// <summary>
-	/// 최종적인 메모리 관리 시스템.
-	/// 유저는 이 클래스에 메모리 할당을 요청한다.
-	/// </summary>
-	/// 
+
 	class MemoryPool;
 	class PageAllocator;
 	class MemoryAllocator;
 
+	/// 메모리 관리 시스템.
+	/// 유저는 이 클래스에 메모리 할당을 요청한다.
 	class MemorySystem
 	{
 	private:
@@ -26,7 +24,6 @@ namespace jh_memory
 
 		MemorySystem& operator=(const MemorySystem& other) = delete;
 		MemorySystem& operator=(MemorySystem&& other) = delete;
-
 
 		void* Alloc(size_t reqSize);
 		void Free(void* ptr);
@@ -50,10 +47,10 @@ namespace jh_memory
 		/// VirtualAlloc을 통해 할당한 메모리를 전달한다.
 		/// </summary>
 		PageAllocator* m_pageAllocator;
-		
 
+#ifdef JH_MEM_ALLOC_CHECK_FLAG
 		LONGLONG m_llTestAllocCounter = 0;
 		LONGLONG m_llTestDeallocCounter = 0;
+#endif
 	};
 }
-

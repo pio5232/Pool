@@ -2,7 +2,7 @@
 #include "PageAllocator.h"
 #include "Profiler.h"
 
-jh_memory::MemoryPool::MemoryPool(size_t allocSize) : m_allocSize{allocSize}, m_llComplexFullNode {}, m_pPartialNodeHead{}, m_partialNodeCount{}, m_pPageAllocator{}, m_llComplexCounter{}
+jh_memory::MemoryPool::MemoryPool(size_t allocSize) : m_allocSize{ allocSize }, m_llComplexFullNode{}, m_pPartialNodeHead{}, m_partialNodeCount{}, m_pPageAllocator{}, m_llComplexCounter{}
 {
 	InitializeSRWLock(&m_partialLock);
 	InitializeSRWLock(&m_allocationLock);
@@ -31,13 +31,11 @@ void jh_memory::MemoryPool::TryPushBlock(Node* nodeHead, size_t nodeCount)
 	do
 	{
 		topComplexNode = m_llComplexFullNode;
-		
+
 		nodeHead->m_llNextComplexBlock = topComplexNode;
 	}
 
 	while (InterlockedCompareExchange64(&m_llComplexFullNode, newComplexNode, topComplexNode) != topComplexNode);
-
-	InterlockedAdd64(&m_llL2DeallocedNodeCount, static_cast<LONGLONG>(nodeCount));
 
 }
 
@@ -48,7 +46,7 @@ jh_memory::Node* jh_memory::MemoryPool::TryPopBlock()
 	LONGLONG topComplexNode;
 
 	Node* topNodePointer;
-	
+
 	while (1)
 	{
 		topComplexNode = m_llComplexFullNode;
@@ -62,7 +60,7 @@ jh_memory::Node* jh_memory::MemoryPool::TryPopBlock()
 			// Level 3에서 새로운 메모리를 할당받아서 블록들을 연결한 상태이다.
 			if (nullptr != newBlock)
 				return newBlock;
-	
+
 			// topNode가 없어서 새로운 블록을 얻으려고 진입했지만 누군가 새로운 블록을 만들어서 다시 경쟁을 하러 내려온 상황이다.
 			continue;
 		}
@@ -71,8 +69,7 @@ jh_memory::Node* jh_memory::MemoryPool::TryPopBlock()
 			break;
 	}
 
-	InterlockedAdd64(&m_llL2AllocedNodeCount, static_cast<LONGLONG>(topNodePointer->m_blockSize));
-	return topNodePointer;
+		return topNodePointer;
 }
 
 
@@ -95,7 +92,7 @@ void jh_memory::MemoryPool::TryPushBlockList(Node* nodeHead, Node* nodeTail)
 	}
 
 	while (InterlockedCompareExchange64(&m_llComplexFullNode, newComplexNode, topComplexNode) != topComplexNode);
-	
+
 }
 
 // 이 함수는 MemoryAllocator가 소멸될때만 호출되어야한다.
@@ -114,10 +111,8 @@ void jh_memory::MemoryPool::TryPushNode(Node* node)
 		m_pPartialNodeHead = node;
 		m_partialNodeCount++;
 
-		InterlockedIncrement64(&m_llL2DeallocedNodeCount);
-
-		if (kNodeCountPerBlock > m_partialNodeCount)
-			return;
+			if (kNodeCountPerBlock > m_partialNodeCount)
+				return;
 
 		// 한 덩어리로 묶을 수 있는 크기가 된다면 다시 묶어서 FullNode List에 넣어준다.
 		Node* curNode = m_pPartialNodeHead;
@@ -137,10 +132,6 @@ void jh_memory::MemoryPool::TryPushNode(Node* node)
 
 	// 해당 개수만큼을 LEVEL 2에 반환한다.
 	TryPushBlock(separatedNode, kNodeCountPerBlock);
-
-	LONGLONG r = kNodeCountPerBlock;
-	
-	InterlockedAdd64(&m_llL2DeallocedNodeCount, -r);
 
 
 }
@@ -170,7 +161,7 @@ jh_memory::Node* jh_memory::MemoryPool::GetNewBlock()
 
 			// [kBlockCountToCraete-2](head) -> [...] -> [0] (tail)
 			Node* head = nullptr;
-			Node *tail = nullptr;
+			Node* tail = nullptr;
 
 			// lastBlock : 연결하지 않고 반환해서 사용할 마지막 블럭.
 			Node* lastBlock = nullptr;
@@ -215,15 +206,12 @@ jh_memory::Node* jh_memory::MemoryPool::GetNewBlock()
 			}
 
 			if (nullptr != head && nullptr != tail)
-			TryPushBlockList(head, tail);
+				TryPushBlockList(head, tail);
 
-			if(nullptr != lastBlock)
-			lastBlock->m_llNextComplexBlock = 0;
-			
-			InterlockedAdd64(&m_llL2TotalNode, kNodeCountToCreate);
-			InterlockedAdd64(&m_llL2AllocedNodeCount, static_cast<LONGLONG>(lastBlock->m_blockSize));
+			if (nullptr != lastBlock)
+				lastBlock->m_llNextComplexBlock = 0;
 
-			return lastBlock;
+				return lastBlock;
 		}
 		else
 		{

@@ -76,10 +76,10 @@ jh_memory::MemoryAllocator::~MemoryAllocator()
 		{
 			// 스택이 빌 때까지 다음 노드를 꺼냅니다.
 			Node* node = stack.Pop();
-			
+
 			if (nullptr == node)
 				break;
-		
+
 			m_pPool[i]->TryPushNode(node);
 		}
 	}
@@ -103,7 +103,7 @@ void* jh_memory::MemoryAllocator::Alloc(size_t allocSize)
 
 
 
-void jh_memory::MemoryAllocator::Dealloc(void* ptr,size_t allocSize)
+void jh_memory::MemoryAllocator::Dealloc(void* ptr, size_t allocSize)
 {
 	MEMORY_POOL_PROFILE_FLAG;
 	int poolIdx = poolTable[allocSize];
@@ -113,7 +113,7 @@ void jh_memory::MemoryAllocator::Dealloc(void* ptr,size_t allocSize)
 	nodeStack.Push(static_cast<Node*>(ptr));
 
 	// 일정 수량 이상이면 절반을 LEVEL 2에 반납한다.
-	
+
 	if (nodeStack.GetTotalCount() == (kNodeCountPerBlock * 2))
 	{
 		m_pPool[poolIdx]->TryPushBlock(nodeStack.m_pSubHead, kNodeCountPerBlock);
@@ -122,6 +122,3 @@ void jh_memory::MemoryAllocator::Dealloc(void* ptr,size_t allocSize)
 
 	}
 }
-
-
-

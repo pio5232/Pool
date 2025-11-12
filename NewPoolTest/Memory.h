@@ -15,7 +15,7 @@
 
 namespace jh_memory
 {
-	
+
 	/// <summary>
 	/// m_pNextNode : Node들의 연결을 나타낸다.
 	/// 
@@ -63,12 +63,12 @@ namespace jh_memory
 	// MemoryPool Size * kMaxBlockCount 와 kAllocationGranularity를 통해 할당받을 사이즈를 정의한다.
 	constexpr size_t kAllocationGranularity = 4096 * 16;
 	constexpr size_t kNodeCountToCreate = 4096;
-	
+
 	// MemoryPool에서 관리되는 1블럭당 연결된 Node의 수
 	constexpr size_t kNodeCountPerBlock = 512;
-	
+
 	constexpr size_t kBlockCountToCreate = kNodeCountToCreate / kNodeCountPerBlock;
-	
+
 	// Pool에서 관리할 수 있는 최대 사이즈. 이 사이즈를 넘어가면 new / delete를 통해 할당/해제를 진행한다.
 	constexpr size_t kMaxAllocSize = 4096;
 
@@ -78,13 +78,7 @@ namespace jh_memory
 	constexpr ULONGLONG kPointerMask = 0x00007fffffffffff;
 	constexpr int kCounterShift = 47;
 
-	inline constexpr std::array<int, kMaxAllocSize + 1> CreatePoolTable();
-
-	class PageAllocator; // LEVEL 3
-	class MemoryPool; // LEVEL 2
-	class MemoryAllocator; // LEVEL 1
-
-	inline constexpr std::array<int, kMaxAllocSize + 1> CreatePoolTable()
+	inline consteval std::array<int, kMaxAllocSize + 1> CreatePoolTable()
 	{
 		std::array<int, kMaxAllocSize + 1> poolTable{};
 
@@ -104,6 +98,11 @@ namespace jh_memory
 		}
 		return poolTable;
 	}
+
+	class PageAllocator; // LEVEL 3
+	class MemoryPool; // LEVEL 2
+	class MemoryAllocator; // LEVEL 1
+
 
 	inline constexpr std::array<int, kMaxAllocSize + 1> poolTable = CreatePoolTable(); // Size 요청에 따른 인덱스 탐색을 위한 맵핑 테이블
 }
