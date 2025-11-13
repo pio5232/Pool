@@ -31,13 +31,13 @@ namespace jh_memory
 			return InterlockedIncrement64(&m_llComplexCounter);
 		}
 
-		// Node* -> [Counter][Node*] 형태로 만든다
+		// Node* -> [Counter][Node*] 형태로 변환
 		LONGLONG GetComplexNode(LONGLONG counter, Node* node) const
 		{
 			return  (reinterpret_cast<LONGLONG>(node) | (counter << kCounterShift));
 		}
 
-		// [Counter ][Node*] -> Node* 형태로 만든다.
+		// [Counter ][Node*] -> Node* 형태로 변환
 		Node* GetNodePointer(LONGLONG complexNode) const
 		{
 			return  reinterpret_cast<Node*>((complexNode & kPointerMask));

@@ -36,10 +36,10 @@ namespace jh_memory
 	/// 또한 m_llNextComplexBlock : LEVEL 2에서 관리되어야 한다.
 	/// 
 	/// [LEVEL 1] MemoryAllocator를 통해서 사용될 때 Node의 구조
-	/// [	[size_t]					[Data]				[ ]						]
+	/// [	[m_pOwnerAllocator]			[size_t]			[Data]				]
 	/// 
 	/// [LEVEL 2] memoryPool을 통해서 사용될 때 Node의 구조
-	/// [	[m_llNextComplexBlock]		[m_blockSize]		[m_pNextNode]			]
+	/// [	[m_llNextComplexBlock]		[m_blockSize]		[m_pNextNode]		]
 	///  
 	/// 현재 Block과 Node의 차이
 	/// 
@@ -60,7 +60,7 @@ namespace jh_memory
 	constexpr size_t kPoolSizeArr[kPoolCount] = { {64}, { 128 }, { 256 }, { 512 }, { 1024 }, { 2048 }, { 4096 } };
 
 	// Level 3에서 얻어오는 사이즈를 정하기 위한 수
-	// MemoryPool Size * kMaxBlockCount 와 kAllocationGranularity를 통해 할당받을 사이즈를 정의한다.
+	// MemoryPool Size * kMaxBlockCount 와 kAllocationGranularity를 통해 할당받을 사이즈를 정의.
 	constexpr size_t kAllocationGranularity = 4096 * 16;
 	constexpr size_t kNodeCountToCreate = 4096;
 
@@ -69,7 +69,7 @@ namespace jh_memory
 
 	constexpr size_t kBlockCountToCreate = kNodeCountToCreate / kNodeCountPerBlock;
 
-	// Pool에서 관리할 수 있는 최대 사이즈. 이 사이즈를 넘어가면 new / delete를 통해 할당/해제를 진행한다.
+	// Pool에서 관리할 수 있는 최대 사이즈. 이 사이즈를 넘어가면 new / delete를 통해 할당/해제를 진행.
 	constexpr size_t kMaxAllocSize = 4096;
 
 	constexpr size_t kPageSize = 4096;

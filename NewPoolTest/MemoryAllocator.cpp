@@ -58,7 +58,7 @@
 //  Size_3840, // ~ 3840,   [46]
 //  Size_4096, // ~ 4096,   [47]
 
-jh_memory::MemoryAllocator::MemoryAllocator() : m_nodeStack{}, m_pPool{}
+jh_memory::MemoryAllocator::MemoryAllocator() : m_nodeStack{}, m_pPool{}, m_pRemoteNodeListHead{}
 {
 
 }
@@ -74,7 +74,6 @@ jh_memory::MemoryAllocator::~MemoryAllocator()
 
 		while (1)
 		{
-			// 스택이 빌 때까지 다음 노드를 꺼냅니다.
 			Node* node = stack.Pop();
 
 			if (nullptr == node)
@@ -92,10 +91,17 @@ void* jh_memory::MemoryAllocator::Alloc(size_t allocSize)
 
 	void* allocedPointer = m_nodeStack[poolIdx].Pop();
 
-	// 할당할 메모리가 없는 경우 L2에서 가져와서 다시 할당한다.
+	// 할당할 메모리가 없는 경우
+
 	if (nullptr == allocedPointer)
 	{
-		AcquireBlockFromPool(poolIdx);
+		// 1. 다른 스레드에서 반납한 리스트를 nodeStack에 옮긴다. 노드 리스트가 없을 시 false 반환
+		if(false == MergeRemoteNodeList(poolIdx))
+		{ 
+			// 2.  L2에서 가져와서 다시 할당한다.
+			AcquireBlockFromPool(poolIdx);
+		}
+
 		return m_nodeStack[poolIdx].Pop();
 	}
 	return allocedPointer;
@@ -109,16 +115,115 @@ void jh_memory::MemoryAllocator::Dealloc(void* ptr, size_t allocSize)
 	int poolIdx = poolTable[allocSize];
 
 	NodeStack& nodeStack = m_nodeStack[poolIdx];
-	// 해제한 메모리 반납한다.
+	
+	// 사용자가 해제한 메모리 반납.
 	nodeStack.Push(static_cast<Node*>(ptr));
 
-	// 일정 수량 이상이면 절반을 LEVEL 2에 반납한다.
-
-	if (nodeStack.GetTotalCount() == (kNodeCountPerBlock * 2))
+	// 일정 수량 이상이면 절반을 LEVEL 2에 반납.
+	if ((kNodeCountPerBlock * 2) == nodeStack.GetTotalCount())
 	{
 		m_pPool[poolIdx]->TryPushBlock(nodeStack.m_pSubHead, kNodeCountPerBlock);
 		nodeStack.m_pSubHead = nullptr;
 		nodeStack.m_subCount = 0;
-
 	}
+}
+
+void jh_memory::MemoryAllocator::RemoteDealloc(void* ptr, size_t allocSize)
+{
+	MEMORY_POOL_PROFILE_FLAG;
+	int poolIdx = poolTable[allocSize];
+
+	Node* newNode = static_cast<Node*>(ptr);
+	Node*& topNode = m_pRemoteNodeListHead[poolIdx];
+
+	Node* tempTopNode = nullptr;
+	do
+	{
+		tempTopNode = topNode;
+		
+		newNode->m_pNextNode = tempTopNode;	
+	}
+	while (InterlockedCompareExchangePointer(reinterpret_cast<volatile PVOID*>(&topNode), newNode, tempTopNode) != tempTopNode);
+}
+
+void jh_memory::MemoryAllocator::PushRemoteNodeList(Node* head, Node* tail, int poolIdx)
+{
+	// [new head] -> [new tail] -> [기존 head] 형태로 push
+
+	// 멀티 스레드 환경에서 Push하는 스레드는 여러 스레드지만
+	// Pop하는 스레드는 딱 하나의 스레드이다.
+	MEMORY_POOL_PROFILE_FLAG;
+	
+	Node*& topNode = m_pRemoteNodeListHead[poolIdx];
+	Node* tempTopNode = nullptr;
+
+	do
+	{
+		tempTopNode = topNode;
+
+		tail->m_pNextNode = tempTopNode;
+	} 
+	while (InterlockedCompareExchangePointer(reinterpret_cast<volatile PVOID*>(&topNode), head, tempTopNode) != tempTopNode);
+}
+
+bool jh_memory::MemoryAllocator::MergeRemoteNodeList(int poolIdx)
+{
+	MEMORY_POOL_PROFILE_FLAG;
+
+	// 원격 스레드가 반환한 노드가 존재하지 않음.
+	Node* remoteNodeListHead = AcquireRemoteNodeList(poolIdx);
+	
+	if (nullptr == remoteNodeListHead)
+		return false;
+	NodeStack& nodeStack = m_nodeStack[poolIdx];
+
+	Node* head = remoteNodeListHead;
+	Node* tail = nullptr;
+	Node* current = head;
+
+	size_t nodeCount = 0;
+
+	while (nullptr != current && nodeCount < kNodeCountPerBlock)
+	{
+		tail = current;
+		current = current->m_pNextNode;
+		nodeCount++;
+	}
+	
+	tail->m_pNextNode = nullptr;
+
+	// 1. kNodeCountPerBlock > NodeList 수 
+	// 가지고 있는 모든 노드를 mainBlock으로 옮긴 후 종료.
+	m_nodeStack[poolIdx].m_pMainHead = head;
+	m_nodeStack[poolIdx].m_mainCount = nodeCount;
+	
+	if(current == nullptr)
+		return true;
+
+	// 2. kNodeCountPerBlock > 남은 노드 수
+	while (nullptr != current)
+	{
+		tail = head = current;
+		size_t nodeCount = 0;
+
+		while (nullptr != current && nodeCount < kNodeCountPerBlock)
+		{
+			tail = current;
+			current = current->m_pNextNode;
+			nodeCount++;
+		}
+
+		tail->m_pNextNode = nullptr;
+
+		if (nodeCount == kNodeCountPerBlock)
+		{
+			m_pPool[poolIdx]->TryPushBlock(head, kNodeCountPerBlock);
+		}
+		else
+		{
+			PushRemoteNodeList(head, tail, poolIdx);
+		}
+	}
+
+	return true;
 }

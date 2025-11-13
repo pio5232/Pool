@@ -67,22 +67,24 @@ jh_memory::MemorySystem::~MemorySystem()
 void* jh_memory::MemorySystem::Alloc(size_t reqSize)
 {
     MEMORY_POOL_PROFILE_FLAG;
-    size_t allocSize = reqSize + sizeof(size_t);
+    size_t allocSize = reqSize + sizeof(MemoryHeader);
 
     void* pAddr;
-
+    MemoryAllocator* memoryAllocatorPtr;
     if (allocSize > kMaxAllocSize)
     {
+        memoryAllocatorPtr = nullptr;
+
         pAddr = new char[allocSize];
     }
     else
     {
-        MemoryAllocator* memoryAllocatorPtr = GetMemoryAllocator();
+        memoryAllocatorPtr = GetMemoryAllocator();
 
         pAddr = memoryAllocatorPtr->Alloc(allocSize);
     }
 
-    return MemoryHeader::AttachHeader(static_cast<MemoryHeader*>(pAddr), allocSize);
+    return MemoryHeader::AttachHeader(static_cast<MemoryHeader*>(pAddr), memoryAllocatorPtr, allocSize);
 
 }
 
@@ -98,10 +100,19 @@ void jh_memory::MemorySystem::Free(void* ptr)
         delete[] basePtr;
         return;
     }
+    
+    MemoryAllocator* ownerAllocator = basePtr->m_pOwnerAllocator;
+    MemoryAllocator* currentAllocator = GetMemoryAllocator();
 
-    MemoryAllocator* memoryAllocatorPtr = GetMemoryAllocator();
+    // A 스레드 할당 -> A 스레드 반납의 형태
+    if (currentAllocator == ownerAllocator)
+    {
+        currentAllocator->Dealloc(basePtr, allocSize);
+        return;
+    }
 
-    memoryAllocatorPtr->Dealloc(basePtr, allocSize);
+    // A 스레드 할당 -> B 스레드 반납의 형태
+    ownerAllocator->RemoteDealloc(basePtr, allocSize);
 }
 
 jh_memory::MemoryAllocator* jh_memory::MemorySystem::GetMemoryAllocator()

@@ -34,6 +34,14 @@ struct A
 
 int main()
 {
+
+
+	int a = 3;
+	int* pa = &a;
+
+	pa = (int*)34;
+	*pa = 342;
+
 	// 1. 크래시 덤프 핸들러 초기화
 	// (참고: CrashDump 객체는 MemorySystem보다 *먼저* 생성되어야
 	// MemorySystem 소멸 시 발생하는 문제를 잡을 수 있습니다.)
