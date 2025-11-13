@@ -16,12 +16,14 @@ jh_memory::MemorySystem::MemorySystem()
 
         m_poolArr[i]->RegisterPageAllocator(m_pageAllocator);
     }
+
 }
 
 jh_memory::MemorySystem::~MemorySystem()
 {
 #ifdef JH_MEM_ALLOC_CHECK_FLAG
 
+    printf("================================== ~MemorySystem ==================================\n");
     printf("Test Alloc Counter : %lld\n", m_llTestAllocCounter);
     printf("Test Dealloc Counter : %lld\n", m_llTestDeallocCounter);
 
@@ -31,8 +33,8 @@ jh_memory::MemorySystem::~MemorySystem()
 
     for (int i = 0; i < kPoolCount; i++)
     {
-        LONGLONG poolAllocCountSum2 = InterlockedExchange64(&m_poolArr[i]->m_llL2AllocedNodeCount, 0);
-        LONGLONG poolDeallocCountSum2 = InterlockedExchange64(&m_poolArr[i]->m_llL2DeallocedNodeCount, 0);
+        LONGLONG poolAllocCountSum2 = InterlockedExchange64(&m_poolArr[i]->m_llL2AllocNodeCount, 0);
+        LONGLONG poolDeallocCountSum2 = InterlockedExchange64(&m_poolArr[i]->m_llL2DeallocNodeCount, 0);
 
         printf("[%d] poolAllocCountSum2 : [%lld]\n", i, poolAllocCountSum2);
         printf("[%d] poolDeallocCountSum2 : [%lld]\n\n", i, poolDeallocCountSum2);
@@ -52,6 +54,9 @@ jh_memory::MemorySystem::~MemorySystem()
     printf("Test L2 Alloced Sum: %lld\n", poolAllocCountSum);
     printf("Test L2 Dealloced Sum : %lld\n", poolDeallocCountSum);
     printf("Test L2 Created Sum : %lld\n", poolTotal);
+
+    printf("---------------------------------------------------------\n\n");
+
 #else
     for (int i = 0; i < kPoolCount; i++)
     {
@@ -80,6 +85,8 @@ void* jh_memory::MemorySystem::Alloc(size_t reqSize)
         MemoryAllocator* memoryAllocatorPtr = GetMemoryAllocator();
 
         pAddr = memoryAllocatorPtr->Alloc(allocSize);
+
+        ALLOC_COUNT_CHECK(InterlockedIncrement64(&m_llTestAllocCounter);)
     }
 
     return MemoryHeader::AttachHeader(static_cast<MemoryHeader*>(pAddr), allocSize);
@@ -102,6 +109,8 @@ void jh_memory::MemorySystem::Free(void* ptr)
     MemoryAllocator* memoryAllocatorPtr = GetMemoryAllocator();
 
     memoryAllocatorPtr->Dealloc(basePtr, allocSize);
+
+    ALLOC_COUNT_CHECK(InterlockedIncrement64(&m_llTestDeallocCounter);)
 }
 
 jh_memory::MemoryAllocator* jh_memory::MemorySystem::GetMemoryAllocator()
@@ -113,4 +122,23 @@ jh_memory::MemoryAllocator* jh_memory::MemorySystem::GetMemoryAllocator()
         memoryAllocator.RegisterPool(m_poolArr);
 
     return &memoryAllocator;
+}
+
+void jh_memory::MemorySystem::PrintMemoryUsage()
+{
+    ALLOC_COUNT_CHECK(
+    printf("=============================== L2 MemoryPool Usage ===============================\n");
+    for (int i = 0; i < kPoolCount; i++)
+    {
+        LONGLONG l2TotalNodeCount = m_poolArr[i]->m_llL2TotalNode;
+        LONGLONG l2AllocNodeCount = m_poolArr[i]->m_llL2AllocNodeCount;
+        LONGLONG l2DeallocNodeCount = m_poolArr[i]->m_llL2DeallocNodeCount;
+
+        printf("Pool [%2d] Total : [%10lld], Alloc : [%10lld]\n", i, l2TotalNodeCount, l2AllocNodeCount - l2DeallocNodeCount);
+    }
+
+    ULONGLONG l3Bytes = static_cast<ULONGLONG>(m_pageAllocator->GetTotalAllocSize());
+    printf("\nManaged Bytes : [%0.2lf]MB \n\n", static_cast<double>(l3Bytes) / 1024 / 1024 );
+    printf("===================================================================================\n");
+    )
 }

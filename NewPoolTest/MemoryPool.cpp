@@ -37,6 +37,9 @@ void jh_memory::MemoryPool::TryPushBlock(Node* nodeHead, size_t nodeCount)
 
 	while (InterlockedCompareExchange64(&m_llComplexFullNode, newComplexNode, topComplexNode) != topComplexNode);
 
+
+	ALLOC_COUNT_CHECK(InterlockedAdd64(&m_llL2DeallocNodeCount, static_cast<LONGLONG>(nodeCount));)
+
 }
 
 jh_memory::Node* jh_memory::MemoryPool::TryPopBlock()
@@ -69,6 +72,7 @@ jh_memory::Node* jh_memory::MemoryPool::TryPopBlock()
 			break;
 	}
 
+	ALLOC_COUNT_CHECK(InterlockedAdd64(&m_llL2AllocNodeCount, static_cast<LONGLONG>(topNodePointer->m_blockSize));)
 		return topNodePointer;
 }
 
@@ -111,6 +115,8 @@ void jh_memory::MemoryPool::TryPushNode(Node* node)
 		m_pPartialNodeHead = node;
 		m_partialNodeCount++;
 
+		ALLOC_COUNT_CHECK(InterlockedIncrement64(&m_llL2DeallocNodeCount);)
+
 			if (kNodeCountPerBlock > m_partialNodeCount)
 				return;
 
@@ -132,6 +138,13 @@ void jh_memory::MemoryPool::TryPushNode(Node* node)
 
 	// 해당 개수만큼을 LEVEL 2에 반환한다.
 	TryPushBlock(separatedNode, kNodeCountPerBlock);
+
+	ALLOC_COUNT_CHECK
+	(
+		LONGLONG r = kNodeCountPerBlock;
+
+	InterlockedAdd64(&m_llL2DeallocNodeCount, -r);
+	)
 
 
 }
@@ -211,6 +224,11 @@ jh_memory::Node* jh_memory::MemoryPool::GetNewBlock()
 			if (nullptr != lastBlock)
 				lastBlock->m_llNextComplexBlock = 0;
 
+			ALLOC_COUNT_CHECK
+			(
+				InterlockedAdd64(&m_llL2TotalNode, kNodeCountToCreate);
+			InterlockedAdd64(&m_llL2AllocNodeCount, static_cast<LONGLONG>(lastBlock->m_blockSize));
+			)
 				return lastBlock;
 		}
 		else
@@ -220,14 +238,3 @@ jh_memory::Node* jh_memory::MemoryPool::GetNewBlock()
 
 	}
 }
-
-
-
-//{
-//	ULONGLONG increasedCounter = InterlockedIncrement64(&m_llComplexCounter);
-//
-//	increasedCounter <<= kCounterShift;
-//
-//	return (increasedCounter | reinterpret_cast<ULONGLONG>(node));
-//
-//}

@@ -60,9 +60,10 @@ namespace jh_memory
 	public:
 #ifdef JH_MEM_ALLOC_CHECK_FLAG
 		alignas(64) LONGLONG m_llL2TotalNode = 0;
-		alignas(64) LONGLONG m_llL2AllocedNodeCount = 0;
-		alignas(64) LONGLONG m_llL2DeallocedNodeCount = 0;
+		alignas(64) LONGLONG m_llL2AllocNodeCount = 0;
+		alignas(64) LONGLONG m_llL2DeallocNodeCount = 0;
 #endif
+
 	};
 }
 

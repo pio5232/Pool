@@ -4,9 +4,25 @@
 
 #include <array>
 
-//#define JH_MEM_FLAG
+//#define JH_MEM_PROFILE_FLAG
 
-#ifdef JH_MEM_FLAG
+// alloc / free 계산용 플래그 
+//#define JH_MEM_ALLOC_CHECK_FLAG
+
+
+// 메모리 추가/제거 카운팅을 위한 정보. 디버깅할때만 플래그를 이용해 탐지하도록 한다.
+#ifdef JH_MEM_ALLOC_CHECK_FLAG
+#define ALLOC_COUNT_CHECK(x) \
+	do {	\
+	{		\
+	x		\
+	}		\
+	} while(0);
+#else 
+#define ALLOC_COUNT_CHECK(x)
+#endif
+
+#ifdef JH_MEM_PROFILE_FLAG
 	#define MEMORY_POOL_PROFILE_FLAG PRO_START_AUTO_FUNC
 #else
 	#define MEMORY_POOL_PROFILE_FLAG 
@@ -20,7 +36,7 @@ namespace jh_memory
 	/// m_pNextNode : Node들의 연결을 나타낸다.
 	/// 
 	/// +---------------------- NodeStack ----------------------+
-	/// |	[(BNode]	->	[Node]	->	[Node]	->	[Node]		|
+	/// |	[Node]	->	[Node]	->	[Node]	->	[Node]		|
 	/// |	NodeStack 내의 연결은 m_pNextNode를 통해 이루어진다.|
 	/// +---------------------- NodeStack ----------------------+ 
 	///			|

@@ -4,7 +4,6 @@
 
 namespace jh_memory
 {
-
 	class MemoryPool;
 	class PageAllocator;
 	class MemoryAllocator;
@@ -28,9 +27,9 @@ namespace jh_memory
 		void* Alloc(size_t reqSize);
 		void Free(void* ptr);
 
-		MemoryAllocator* GetMemoryAllocator();
-
+		void PrintMemoryUsage();
 	private:
+		MemoryAllocator* GetMemoryAllocator();
 
 		/// <summary>
 		/// LEVEL 1. 대부분의 경우 독립적으로 메모리를 할당 / 해제한다.
